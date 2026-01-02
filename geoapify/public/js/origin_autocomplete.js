@@ -15,7 +15,7 @@ frappe.ui.form.on('Freight Quote', {
 
     input.addEventListener("input", frappe.utils.debounce(() => {
       frappe.call({
-        method: "geoapify_integration.api.geoapify.autocomplete",
+	    method: "geoapify.geoapify.api.geoapify.autocomplete",
         args: { text: input.value },
         callback(r) {
           results = r.message || [];

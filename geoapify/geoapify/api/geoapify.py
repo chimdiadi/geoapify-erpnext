@@ -8,7 +8,7 @@ def autocomplete(text):
         return []
 
     api_key = frappe.db.get_single_value(
-        "Geoapify Settings", "geoapify_key"
+        "Geoapify Settings", "api_key"
     )
 
     if not api_key:
