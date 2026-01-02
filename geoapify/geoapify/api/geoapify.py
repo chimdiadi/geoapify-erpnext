@@ -7,12 +7,13 @@ def autocomplete(text):
     if not text or len(text) < 3:
         return []
 
-    api_key = frappe.db.get_single_value(
-        "Geoapify Settings", "api_key"
-    )
-
-    if not api_key:
-        frappe.throw("Geoapify API key not configured")
+#    api_key = frappe.db.get_single_value(
+#        "Geoapify Settings", "api_key"
+#    )
+#
+#    if not api_key:
+#        frappe.throw("Geoapify API key not configured")
+    api_key = '8db139c7e0cb42108ca839cfaa60b37d'
 
     r = requests.get(
         "https://api.geoapify.com/v1/geocode/autocomplete",
