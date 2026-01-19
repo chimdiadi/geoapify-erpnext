@@ -122,3 +122,75 @@ def heavy_truck_distance(
         },
     }
 
+
+
+@frappe.whitelist()
+def heavy_truck_route_geojson(
+    waypoints: Any,
+    units: str = "metric",
+    api_key: Optional[str] = None,
+    traffic: str = "free_flow",
+    max_speed: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Road-following route geometry for 2+ waypoints using Geoapify Routing API (geojson format).
+    Additive API: does not change heavy_truck_distance().
+    """
+    key = _get_geoapify_key(api_key)
+
+    # Normalize waypoints into [(lat, lon), ...]
+    wp_list: List[Tuple[float, float]] = []
+    if isinstance(waypoints, str):
+        parts = [p.strip() for p in waypoints.split("|") if p.strip()]
+        for p in parts:
+            lat_s, lon_s = [x.strip() for x in p.split(",")]
+            wp_list.append((_parse_float("lat", lat_s), _parse_float("lon", lon_s)))
+    else:
+        for item in (waypoints or []):
+            if isinstance(item, dict):
+                wp_list.append((_parse_float("lat", item.get("lat")), _parse_float("lon", item.get("lon"))))
+            else:
+                wp_list.append((_parse_float("lat", item[0]), _parse_float("lon", item[1])))
+
+    if len(wp_list) < 2:
+        frappe.throw("At least 2 waypoints are required.")
+
+    params: Dict[str, Any] = {
+        "waypoints": "|".join([f"{lat},{lon}" for lat, lon in wp_list]),
+        "mode": "heavy_truck",
+        "format": "geojson",   # <-- NEW: geometry + steps in GeoJSON FeatureCollection
+        "units": units,
+        "traffic": traffic,
+        "apiKey": key,
+    }
+    if max_speed is not None:
+        params["max_speed"] = int(max_speed)
+
+    try:
+        resp = requests.get(GEOAPIFY_ROUTING_URL, params=params, timeout=25)
+    except requests.RequestException as exc:
+        frappe.throw(f"Geoapify routing request failed: {exc}")
+
+    if resp.status_code != 200:
+        try:
+            err = resp.json()
+        except Exception:
+            err = {"message": resp.text}
+        frappe.throw(f"Geoapify routing error ({resp.status_code}): {err}")
+
+    fc = resp.json()
+    features = fc.get("features") or []
+    if not features:
+        frappe.throw("Geoapify returned no features (empty FeatureCollection).")
+
+    props = (features[0].get("properties") or {})
+    summary = {
+        "distance": props.get("distance"),
+        "distance_units": props.get("distance_units"),
+        "time_seconds": props.get("time"),
+        "mode": props.get("mode"),
+        "units": props.get("units"),
+        "toll": props.get("toll"),
+    }
+
+    return {"summary": summary, "geojson": fc}
